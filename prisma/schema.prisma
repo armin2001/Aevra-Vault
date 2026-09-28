@@ -1,0 +1,43 @@
+// Server-side backup of the vault. The server only ever stores ciphertext and
+// the password-wrapped vault key; it can never decrypt anything.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// Salt, PBKDF2 cost and AES-KW-wrapped VEK. Single row with id "vault".
+model VaultKey {
+  id         String    @id @default("vault")
+  salt       String
+  iterations Int
+  wrappedVek String
+  /// Stable vault identity across master password changes (null for vaults created before it existed).
+  vaultId    String?
+  /// When the current wrapping was made; password changes must be newer.
+  changedAt  DateTime?
+  /// Identity of the VEK; set when the vault key is replaced. Item writes must name it.
+  keyId      String?
+  createdAt  DateTime  @default(now())
+}
+
+/// One encrypted vault item (a CiphertextPayload plus timestamps).
+model VaultItem {
+  id         String   @id
+  version    Int
+  alg        String
+  nonce      String
+  ciphertext String
+  createdAt  DateTime
+  updatedAt  DateTime
+}
+
+/// Marks an item as deleted so a sync from another device cannot bring it back.
+model VaultTombstone {
+  id        String   @id
+  deletedAt DateTime
+}
